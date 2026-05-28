@@ -1,0 +1,51 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Lymbe AI",
+  "version": "0.1.0",
+  "identifier": "ai.lymbe.desktop",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Lymbe AI",
+        "label": "main",
+        "width": 1180,
+        "height": 760,
+        "minWidth": 760,
+        "minHeight": 480,
+        "decorations": false,
+        "transparent": false,
+        "shadow": true,
+        "fullscreen": false,
+        "resizable": true,
+        "center": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Productivity",
+    "shortDescription": "Lymbe AI Desktop — KI-Mitarbeiter direkt auf deinem Rechner",
+    "longDescription": "Native Desktop-App für die Lymbe AI Plattform. Verbinde dich mit deinem zugewiesenen Bot und chatte direkt vom Desktop.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [],
+    "copyright": "© 2026 Flubber Pixels UG"
+  }
+}
