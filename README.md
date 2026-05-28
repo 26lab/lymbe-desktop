@@ -123,6 +123,70 @@ npm run tauri:build
 
 Erzeugt `.deb`, `.rpm` und `.AppImage` unter `src-tauri/target/release/bundle/`.
 
+## Releases (alle Plattformen automatisch)
+
+Tauri kann nicht zuverlässig cross-compilen. Damit du nicht drei Rechner anwerfen musst, übernimmt **GitHub Actions** den Multi-OS-Build:
+
+- `.github/workflows/release.yml` — getriggert wenn du einen Tag pushst (z. B. `v0.1.0`). Läuft parallel auf `macos-latest`, `windows-latest`, `ubuntu-22.04`, baut Installer und veröffentlicht ein **Draft Release** mit allen Artifacts.
+- `.github/workflows/build.yml` — bei jedem PR ein Build-Smoke-Test, damit du nicht im Tag-Moment merkst dass was kaputt ist.
+
+### Einrichtung (einmalig)
+
+1. Repo auf GitHub anlegen, z. B. `26lab/lymbe-desktop`
+2. `git remote add origin git@github.com:26lab/lymbe-desktop.git && git push -u origin main`
+3. Fertig — die Workflows werden beim ersten Push automatisch erkannt
+
+### Release veröffentlichen
+
+```bash
+# Version in package.json + src-tauri/tauri.conf.json + src-tauri/Cargo.toml anheben
+# (idealerweise per "npm version 0.1.1" — bumpt package.json automatisch)
+
+git commit -am "release: v0.1.1"
+git tag v0.1.1
+git push --follow-tags
+```
+
+Nach ~10–15 Minuten findest du ein **Draft Release** unter `Releases` mit:
+
+- `Lymbe AI_0.1.1_x64_en-US.msi` (Windows Installer)
+- `Lymbe AI_0.1.1_x64-setup.exe` (Windows NSIS)
+- `Lymbe AI_0.1.1_universal.dmg` (macOS Universal — Intel + Apple Silicon)
+- `lymbe-ai_0.1.1_amd64.deb` (Debian/Ubuntu)
+- `lymbe-ai-0.1.1-1.x86_64.rpm` (Fedora/RHEL)
+- `lymbe-ai_0.1.1_amd64.AppImage` (portable Linux)
+
+Den Release-Body bearbeiten, **Publish** klicken — fertig.
+
+### Code-Signing (für seriöse Distribution dringend empfohlen)
+
+Ohne Signing zeigt **Windows SmartScreen** "Unbekannter Herausgeber" und macOS' **Gatekeeper** blockt den ersten Start. Für interne Tests OK; für externe Endnutzer:
+
+**macOS** ($99/Jahr Apple Developer Program):
+1. Developer ID Application Certificate aus Apple-Keychain als `.p12` exportieren
+2. Als Base64 in GitHub-Secrets ablegen:
+   - `APPLE_CERTIFICATE` (base64-codierte `.p12`)
+   - `APPLE_CERTIFICATE_PASSWORD`
+   - `APPLE_SIGNING_IDENTITY` (z. B. `Developer ID Application: Flubber Pixels UG (TEAM_ID)`)
+   - `APPLE_ID`, `APPLE_PASSWORD` (App-Specific Password), `APPLE_TEAM_ID`
+
+**Windows** (~€300–500/Jahr EV-Code-Signing-Cert):
+- Eigenes Cert: privater Schlüssel als `TAURI_SIGNING_PRIVATE_KEY` + `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` in Secrets
+- Günstigere Alternative: [Azure Trusted Signing](https://learn.microsoft.com/en-us/azure/trusted-signing/) (~$10/Monat)
+
+Alle Secrets sind im `release.yml` schon als ENV-Variablen verdrahtet — wenn du sie in GitHub Settings → Secrets ablegst, wird automatisch signiert.
+
+### Auto-Updates (optional, später aktivierbar)
+
+Tauri 2 hat einen eingebauten Updater: `@tauri-apps/plugin-updater`. Aktivierung:
+
+1. `npm install @tauri-apps/plugin-updater` + im `Cargo.toml` `tauri-plugin-updater` ergänzen
+2. In `tauri.conf.json` unter `plugins.updater` deinen Public-Key + Endpoint hinterlegen
+3. Beim Release über `tauri-action` automatisch ein `latest.json` generieren lassen
+4. Im App-Start checken `await check()` → wenn neue Version: User-Dialog → install
+
+Für jetzt absichtlich weggelassen — der Client funktioniert auch ohne, und der Updater braucht einen statischen URL-Endpoint (z. B. einen Bucket oder ein simples Lymbe-Backend-Route).
+
 ## Icons
 
 Vor dem ersten `tauri:build` Icons hinzufügen:

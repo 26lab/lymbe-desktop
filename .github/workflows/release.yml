@@ -1,0 +1,89 @@
+name: Release
+
+# Triggered whenever you push a tag like `v0.1.0`. Builds installers on
+# native Windows / macOS / Linux runners in parallel and publishes a draft
+# GitHub Release with all of them attached. Edit the draft + click
+# "Publish" once you're happy with the release notes.
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: '--target universal-apple-darwin'
+          - platform: ubuntu-22.04
+            args: ''
+          - platform: windows-latest
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build deps
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev librsvg2-dev patchelf \
+            libgtk-3-dev libxdo-dev libssl-dev
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Rust (stable, with macOS targets for universal)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Cache Rust target dir
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install npm deps
+        run: npm ci
+
+      - name: Build + draft release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Code-signing — fill these in via repo secrets once you have certs.
+          # Apple (notarization + Developer ID):
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Windows (Authenticode):
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Lymbe AI Desktop ${{ github.ref_name }}'
+          releaseBody: |
+            Native Lymbe AI Desktop-Client.
+
+            **Downloads:**
+            - Windows: `.msi` (empfohlen) oder `.exe` (NSIS)
+            - macOS: `.dmg` (Universal — Intel + Apple Silicon)
+            - Linux: `.AppImage`, `.deb` oder `.rpm`
+
+            Erste Schritte: nach dem Start in den Einstellungen Server-URL +
+            API-Token aus dem Web-Dashboard (Profil → Meine Desktop-App) eintragen.
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
