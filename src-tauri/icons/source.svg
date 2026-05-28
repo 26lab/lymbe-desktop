@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    Lymbe AI App Icon
+    - Rounded square background (~22% radius matches macOS Squircle vibe)
+    - Sans-serif "L" in accent orange
+    - Accent dot top-right = the dot of "i" in "LYMBE AI" — keeps the icon
+      recognizable even at 32×32 in the taskbar
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#15171a"/>
+      <stop offset="100%" stop-color="#0a0b0d"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FF5C19"/>
+      <stop offset="100%" stop-color="#FF4A00"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="1024" rx="230" ry="230" fill="url(#bg)"/>
+
+  <!-- The L -->
+  <path d="
+    M 295 205
+    L 295 819
+    L 800 819
+    L 800 691
+    L 425 691
+    L 425 205
+    Z
+  " fill="url(#accent)"/>
+
+  <!-- AI dot, top-right -->
+  <circle cx="788" cy="282" r="62" fill="url(#accent)"/>
+</svg>
