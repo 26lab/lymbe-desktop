@@ -1,9 +1,13 @@
 name: Release
 
 # Triggered whenever you push a tag like `v0.1.0`. Builds installers on
-# native Windows / macOS / Linux runners in parallel and publishes a draft
+# native macOS / Windows / Linux runners in parallel and publishes a draft
 # GitHub Release with all of them attached. Edit the draft + click
 # "Publish" once you're happy with the release notes.
+#
+# macOS is split into two jobs (arm64 + x86_64) instead of one Universal
+# build because Tauri's `--target universal-apple-darwin` is notoriously
+# flaky in CI — this is the recommended split by the Tauri team itself.
 on:
   push:
     tags:
@@ -18,11 +22,17 @@ jobs:
       matrix:
         include:
           - platform: macos-latest
-            args: '--target universal-apple-darwin'
+            args: '--target aarch64-apple-darwin'
+            rust_target: aarch64-apple-darwin
+          - platform: macos-latest
+            args: '--target x86_64-apple-darwin'
+            rust_target: x86_64-apple-darwin
           - platform: ubuntu-22.04
             args: ''
+            rust_target: ''
           - platform: windows-latest
             args: ''
+            rust_target: ''
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -43,10 +53,10 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Setup Rust (stable, with macOS targets for universal)
+      - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.rust_target }}
 
       - name: Cache Rust target dir
         uses: swatinem/rust-cache@v2
@@ -61,14 +71,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Code-signing — fill these in via repo secrets once you have certs.
-          # Apple (notarization + Developer ID):
+          # Without them the build still succeeds, just unsigned (SmartScreen
+          # warning on Windows, Gatekeeper "unidentified developer" on macOS).
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          # Windows (Authenticode):
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
@@ -79,7 +89,8 @@ jobs:
 
             **Downloads:**
             - Windows: `.msi` (empfohlen) oder `.exe` (NSIS)
-            - macOS: `.dmg` (Universal — Intel + Apple Silicon)
+            - macOS Apple Silicon: `.dmg` (aarch64)
+            - macOS Intel: `.dmg` (x64)
             - Linux: `.AppImage`, `.deb` oder `.rpm`
 
             Erste Schritte: nach dem Start in den Einstellungen Server-URL +
