@@ -1,4 +1,4 @@
-import { Plus, MessageSquare, Trash2, Settings as SettingsIcon } from 'lucide-react';
+import { Plus, MessageSquare, Trash2, Settings as SettingsIcon, RefreshCw } from 'lucide-react';
 import type { Chat } from '../lib/types';
 
 interface Props {
@@ -8,6 +8,9 @@ interface Props {
   onNewChat: () => void;
   onDeleteChat: (id: string) => void;
   onOpenSettings: () => void;
+  updateReady: boolean;
+  updateInstalling: boolean;
+  onInstallUpdate: () => void;
 }
 
 export function Sidebar({
@@ -17,6 +20,9 @@ export function Sidebar({
   onNewChat,
   onDeleteChat,
   onOpenSettings,
+  updateReady,
+  updateInstalling,
+  onInstallUpdate,
 }: Props) {
   return (
     <aside className="w-64 shrink-0 border-r border-[var(--color-border)] flex flex-col bg-[rgb(var(--color-surface))]">
@@ -49,7 +55,18 @@ export function Sidebar({
         )}
       </nav>
 
-      <div className="border-t border-[var(--color-border)] p-2">
+      <div className="border-t border-[var(--color-border)] p-2 space-y-1">
+        {updateReady && (
+          <button
+            type="button"
+            onClick={onInstallUpdate}
+            disabled={updateInstalling}
+            className="w-full inline-flex items-center gap-2 h-9 px-3 rounded-lg text-[13px] text-[rgb(var(--color-text-2))] border border-[var(--color-border)] hover:bg-[rgb(var(--color-surface-2))] transition-colors disabled:opacity-60 disabled:cursor-wait"
+          >
+            <RefreshCw className={`w-4 h-4 ${updateInstalling ? 'animate-spin' : ''}`} />
+            Neu starten, um zu aktualisieren
+          </button>
+        )}
         <button
           type="button"
           onClick={onOpenSettings}

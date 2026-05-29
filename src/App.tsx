@@ -5,6 +5,7 @@ import { Sidebar } from './components/Sidebar';
 import { ChatView } from './components/ChatView';
 import { SettingsDialog } from './components/SettingsDialog';
 import { useTheme } from './hooks/useTheme';
+import { useUpdater } from './hooks/useUpdater';
 import { loadChats, loadSettings, saveChats, saveSettings } from './lib/storage';
 import { listBots, streamChat } from './lib/api';
 import type { BotSummary, Chat, ChatMessage, Settings } from './lib/types';
@@ -23,6 +24,7 @@ export default function App() {
   const persistTimer = useRef<number | null>(null);
 
   useTheme(settings.theme);
+  const updater = useUpdater(settings);
 
   // Initial load — settings + chats + os.
   useEffect(() => {
@@ -230,6 +232,9 @@ export default function App() {
           onNewChat={handleNewChat}
           onDeleteChat={handleDeleteChat}
           onOpenSettings={() => setSettingsOpen(true)}
+          updateReady={updater.status === 'ready' || updater.status === 'installing'}
+          updateInstalling={updater.status === 'installing'}
+          onInstallUpdate={updater.installAndRestart}
         />
         <ChatView
           chat={activeChat}

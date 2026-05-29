@@ -58,6 +58,17 @@
       }
     },
     "resources": [],
-    "copyright": "© 2026 Flubber Pixels UG"
+    "copyright": "© 2026 Flubber Pixels UG",
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "dialog": false,
+      "endpoints": [
+        "https://app.lymbe.ai/api/desktop-app/update/{{target}}/{{arch}}/{{current_version}}"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU3MDUzNDlBQjA2MDc2QUIKUldTcmRtQ3dtalFGVjBvZWJIZExtSzVIVmJGbTR6RDNRc0M5bk1iZ0tRWGxMZHYyNVJvK1hkVlkK"
+    }
   }
 }

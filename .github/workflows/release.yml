@@ -68,6 +68,15 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Auto-updater signing — when both secrets are set, tauri-action
+          # emits `<bundle>.sig` alongside each artifact and the desktop
+          # auto-updater (see /api/desktop-app/update on lymbe-ai) accepts
+          # them. Generate the keypair once locally:
+          #   npx @tauri-apps/cli signer generate -w lymbe-desktop.key
+          # then store TAURI_SIGNING_PRIVATE_KEY (file contents) + the
+          # passphrase in the repo's Actions Secrets.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Lymbe AI Desktop ${{ github.ref_name }}'
