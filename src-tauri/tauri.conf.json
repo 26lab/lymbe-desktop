@@ -18,7 +18,7 @@
         "height": 760,
         "minWidth": 760,
         "minHeight": 480,
-        "decorations": false,
+        "decorations": true,
         "transparent": false,
         "shadow": true,
         "fullscreen": false,
