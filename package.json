@@ -1,7 +1,7 @@
 {
   "name": "lymbe-desktop",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Lymbe AI Desktop — native KI-Mitarbeiter-Client für Windows, macOS und Linux",
   "scripts": {

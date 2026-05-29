@@ -1,6 +1,6 @@
 [package]
 name = "lymbe-desktop"
-version = "0.1.0"
+version = "0.1.1"
 description = "Lymbe AI Desktop"
 authors = ["Lymbe AI"]
 edition = "2021"
