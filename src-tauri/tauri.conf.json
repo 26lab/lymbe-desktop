@@ -18,14 +18,9 @@
         "height": 760,
         "minWidth": 760,
         "minHeight": 480,
-        "decorations": true,
-        "transparent": false,
-        "shadow": true,
-        "fullscreen": false,
         "resizable": true,
-        "center": true,
-        "titleBarStyle": "Overlay",
-        "hiddenTitle": true
+        "fullscreen": false,
+        "center": true
       }
     ],
     "security": {
@@ -45,6 +40,23 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "exceptionDomain": "",
+      "signingIdentity": null,
+      "providerShortName": null,
+      "entitlements": null
+    },
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
+    },
+    "linux": {
+      "deb": {
+        "depends": []
+      }
+    },
     "resources": [],
     "copyright": "© 2026 Flubber Pixels UG"
   }

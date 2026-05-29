@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { nanoid } from 'nanoid';
 import { open as openExternal } from '@tauri-apps/plugin-shell';
-import { type as osType } from '@tauri-apps/plugin-os';
-import { TitleBar } from './components/TitleBar';
 import { Sidebar } from './components/Sidebar';
 import { ChatView } from './components/ChatView';
 import { SettingsDialog } from './components/SettingsDialog';
@@ -20,7 +18,6 @@ export default function App() {
   const [streaming, setStreaming] = useState(false);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [os, setOs] = useState<'macos' | 'windows' | 'linux' | 'other'>('other');
 
   const abortRef = useRef<AbortController | null>(null);
   const persistTimer = useRef<number | null>(null);
@@ -38,13 +35,6 @@ export default function App() {
       // Open settings on first launch when no token is set yet — otherwise the
       // app would just sit there confused.
       if (!s.token) setSettingsOpen(true);
-
-      try {
-        const t = await osType();
-        setOs(t === 'macos' ? 'macos' : t === 'windows' ? 'windows' : t === 'linux' ? 'linux' : 'other');
-      } catch {
-        // ignore — fallback to "other"
-      }
     })();
   }, []);
 
@@ -232,7 +222,6 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-full">
-      <TitleBar os={os} />
       <div className="flex-1 flex min-h-0">
         <Sidebar
           chats={chats}

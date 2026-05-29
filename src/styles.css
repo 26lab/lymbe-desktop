@@ -60,15 +60,6 @@
 }
 
 @layer components {
-  .titlebar {
-    -webkit-app-region: drag;
-  }
-  .titlebar button,
-  .titlebar a,
-  .no-drag {
-    -webkit-app-region: no-drag;
-  }
-
   .prose-msg {
     @apply text-[14.5px] leading-relaxed;
   }

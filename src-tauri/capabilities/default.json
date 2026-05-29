@@ -1,17 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capabilities for the main window — file dialogs, persistent store, open links.",
+  "description": "Default capabilities for the main window: persistent store, open links, native dialogs.",
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "core:window:allow-start-dragging",
-    "core:window:allow-close",
-    "core:window:allow-minimize",
-    "core:window:allow-toggle-maximize",
-    "core:window:allow-is-maximized",
     "store:default",
-    "os:default",
     "shell:allow-open",
     "dialog:default"
   ]

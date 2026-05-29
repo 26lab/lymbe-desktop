@@ -4,7 +4,6 @@
 //
 // The plugins below register the JS-facing APIs:
 //   - tauri-plugin-store  → persistent key/value on disk (chats, settings)
-//   - tauri-plugin-os     → platform detection for tiny UI tweaks
 //   - tauri-plugin-shell  → open external links in the user's browser
 //   - tauri-plugin-dialog → native message boxes (delete confirmations etc.)
 
@@ -12,7 +11,6 @@
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::default().build())
-        .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .run(tauri::generate_context!())
