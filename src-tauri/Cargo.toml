@@ -16,7 +16,13 @@ tauri-build = { version = "2.0", features = [] }
 [dependencies]
 # 2.2 ist die Untergrenze wegen TrayIconBuilder::show_menu_on_left_click —
 # davor hiess die Methode menu_on_left_click.
-tauri = { version = "2.2", features = ["tray-icon", "image-png"] }
+#
+# macos-private-api gehoert zwingend zu "macOSPrivateApi": true in
+# tauri.conf.json — ohne das Feature bricht das Build-Script ab. Noetig ist es
+# fuer das durchsichtige Fenster des schwebenden Symbols. Apple laesst Apps mit
+# privaten APIs nicht in den App Store; fuer den Direktvertrieb ueber eigene
+# Installer, wie hier, ist es unproblematisch.
+tauri = { version = "2.2", features = ["tray-icon", "image-png", "macos-private-api"] }
 tauri-plugin-store = "2.0"
 tauri-plugin-shell = "2.0"
 tauri-plugin-dialog = "2.0"
