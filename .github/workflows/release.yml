@@ -84,13 +84,15 @@ jobs:
             Native Lymbe AI Desktop-Client.
 
             **Downloads:**
-            - Windows: `.msi` (empfohlen) oder `.exe` (NSIS)
+            - Windows: `.exe` (NSIS, empfohlen) oder `.msi`
             - macOS Apple Silicon: `.dmg` (aarch64)
             - macOS Intel: `.dmg` (x64)
             - Linux: `.AppImage`, `.deb` oder `.rpm`
 
-            Erste Schritte: nach dem Start in den Einstellungen Server-URL +
-            API-Token aus dem Web-Dashboard (Profil → Meine Desktop-App) eintragen.
+            **Erste Schritte:** Nach dem Start zeigt die App einen achtstelligen
+            Code. Diesen im Web-Dashboard unter *Profil → Meine Desktop-App*
+            eintragen und bestätigen — fertig. Ein API-Token muss nicht mehr
+            kopiert werden.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
