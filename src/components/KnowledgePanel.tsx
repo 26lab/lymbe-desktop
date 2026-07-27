@@ -10,6 +10,12 @@ interface Props {
   settings: Settings;
   /** Ohne passenden Tarif bleibt der Bereich sichtbar, aber gesperrt. */
   allowed: boolean;
+  /**
+   * Bot, in dessen Wissensdatenbank die Dateien landen. Wird angezeigt, damit
+   * niemand versehentlich Internes hochlaedt: Der Bot antwortet damit auch
+   * Besuchern auf der Website.
+   */
+  botName: string | null;
 }
 
 /** Der Server nimmt nur diese Typen an — hier gespiegelt, damit die App
@@ -36,7 +42,7 @@ const STATUS_LABEL: Record<string, string> = {
  * Wissensdatenbank fuellen — der Vorteil gegenueber dem Web-Upload ist das
  * Ziehen aus dem Dateimanager direkt ins Fenster.
  */
-export function KnowledgePanel({ settings, allowed }: Props) {
+export function KnowledgePanel({ settings, allowed, botName }: Props) {
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState<string | null>(null);
@@ -145,6 +151,12 @@ export function KnowledgePanel({ settings, allowed }: Props) {
           </p>
           <p className="mt-1 text-[11.5px] text-[rgb(var(--color-text-3))]">
             PDF, TXT, MD, CSV, DOCX — bis 10 MB
+          </p>
+          <p className="mt-2 text-[11.5px] text-[rgb(var(--color-text-2))]">
+            Landet in der Wissensdatenbank von{' '}
+            <strong className="font-medium">{botName || 'deinem Bot'}</strong> und gilt für den
+            gesamten Workspace. Der Bot kann daraus auch Besuchern auf der Website antworten —
+            nichts Internes hochladen.
           </p>
           {uploading && (
             <p className="mt-2 inline-flex items-center gap-1.5 text-[12px] text-[rgb(var(--color-text-2))]">

@@ -455,6 +455,12 @@ export default function App() {
   const liveAvailable = settings.liveChatEnabled && (usage?.features.liveChat ?? false);
   const knowledgeAvailable = usage?.features.knowledgeUpload ?? true;
 
+  // Spiegelt die Zuordnung im Backend: Ist die Lizenz an einen Bot gebunden,
+  // gilt dieser — sonst der erste des Workspaces. Wird im Wissens-Bereich
+  // angezeigt, damit sichtbar ist, wohin ein Dokument wandert.
+  const knowledgeBotId = usage?.license.assignedBotId ?? bots[0]?.id ?? null;
+  const knowledgeBotName = bots.find((b) => b.id === knowledgeBotId)?.name ?? null;
+
   return (
     <div className="flex flex-col h-full">
       <UpdateBanner updater={updater} />
@@ -499,7 +505,11 @@ export default function App() {
         )}
         {view === 'knowledge' && (
           <div className="flex-1 min-w-0">
-            <KnowledgePanel settings={settings} allowed={knowledgeAvailable} />
+            <KnowledgePanel
+              settings={settings}
+              allowed={knowledgeAvailable}
+              botName={knowledgeBotName}
+            />
           </div>
         )}
       </div>
