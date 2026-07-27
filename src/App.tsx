@@ -3,9 +3,11 @@ import { nanoid } from 'nanoid';
 import { invoke } from '@tauri-apps/api/core';
 import { open as openExternal } from '@tauri-apps/plugin-shell';
 import { disable as disableAutostart, enable as enableAutostart, isEnabled as autostartEnabled } from '@tauri-apps/plugin-autostart';
+import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 import { Sidebar, type View } from './components/Sidebar';
 import { ChatView } from './components/ChatView';
 import { SettingsDialog } from './components/SettingsDialog';
+import { UpdateBanner } from './components/UpdateBanner';
 import { ActivationScreen } from './components/ActivationScreen';
 import { LivePanel } from './components/LivePanel';
 import { KnowledgePanel } from './components/KnowledgePanel';
@@ -182,6 +184,27 @@ export default function App() {
       console.warn('[bubble] toggle failed', err),
     );
   }, [settings.floatingBubble, settingsLoaded]);
+
+  // Ist die Installation bereit, während die App im Tray liegt, bekommt das
+  // sonst niemand mit — das Banner sieht nur, wer das Fenster offen hat.
+  useEffect(() => {
+    if (updater.status !== 'ready' || !updater.info) return;
+    if (!settings.notificationsEnabled) return;
+    const version = updater.info.version;
+    (async () => {
+      try {
+        if (!(await isPermissionGranted())) {
+          if ((await requestPermission()) !== 'granted') return;
+        }
+        sendNotification({
+          title: 'Update bereit',
+          body: `Version ${version} kann installiert werden.`,
+        });
+      } catch (err) {
+        console.warn('[updater] notification failed', err);
+      }
+    })();
+  }, [updater.status, updater.info, settings.notificationsEnabled]);
 
   // Intercept clicks on links so they open in the user's browser, not inside
   // the Tauri webview (which has no nav controls).
@@ -434,6 +457,7 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-full">
+      <UpdateBanner updater={updater} />
       <div className="flex-1 flex min-h-0">
         <Sidebar
           view={view}
@@ -446,6 +470,7 @@ export default function App() {
           onOpenSettings={() => setSettingsOpen(true)}
           updateReady={updater.status === 'ready' || updater.status === 'installing'}
           updateInstalling={updater.status === 'installing'}
+          updateVersion={updater.info?.version ?? null}
           onInstallUpdate={updater.installAndRestart}
           usage={usage}
           notifications={notifications}
@@ -484,6 +509,7 @@ export default function App() {
           settings={settings}
           snippets={snippets}
           onSnippetsChange={setSnippets}
+          updater={updater}
           onClose={() => setSettingsOpen(false)}
           onSave={handleSaveSettings}
         />

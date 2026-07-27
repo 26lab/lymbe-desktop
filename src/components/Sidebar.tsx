@@ -25,6 +25,7 @@ interface Props {
   onOpenSettings: () => void;
   updateReady: boolean;
   updateInstalling: boolean;
+  updateVersion: string | null;
   onInstallUpdate: () => void;
   usage: UsageInfo | null;
   notifications: NotificationSnapshot | null;
@@ -45,6 +46,7 @@ export function Sidebar({
   onOpenSettings,
   updateReady,
   updateInstalling,
+  updateVersion,
   onInstallUpdate,
   usage,
   notifications,
@@ -198,8 +200,10 @@ export function Sidebar({
             disabled={updateInstalling}
             className="w-full inline-flex items-center gap-2 h-9 px-3 rounded-lg text-[13px] text-[rgb(var(--color-text-2))] border border-[var(--color-border)] hover:bg-[rgb(var(--color-surface-2))] transition-colors disabled:opacity-60 disabled:cursor-wait"
           >
-            <RefreshCw className={`w-4 h-4 ${updateInstalling ? 'animate-spin' : ''}`} />
-            Neu starten, um zu aktualisieren
+            <RefreshCw className={`w-4 h-4 shrink-0 ${updateInstalling ? 'animate-spin' : ''}`} />
+            <span className="truncate">
+              {updateVersion ? `Auf ${updateVersion} aktualisieren` : 'Neu starten, um zu aktualisieren'}
+            </span>
           </button>
         )}
         <button

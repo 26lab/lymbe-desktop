@@ -3,6 +3,7 @@ import { X, RefreshCw, ExternalLink, Plus, Trash2 } from 'lucide-react';
 import { open } from '@tauri-apps/plugin-shell';
 import { nanoid } from 'nanoid';
 import type { BotSummary, PromptSnippet, Settings } from '../lib/types';
+import type { UpdaterState } from '../hooks/useUpdater';
 import { listBots } from '../lib/api';
 import { saveSnippets } from '../lib/storage';
 
@@ -10,6 +11,7 @@ interface Props {
   settings: Settings;
   snippets: PromptSnippet[];
   onSnippetsChange: (snippets: PromptSnippet[]) => void;
+  updater: UpdaterState;
   onClose: () => void;
   onSave: (next: Settings) => Promise<void>;
 }
@@ -18,6 +20,7 @@ export function SettingsDialog({
   settings,
   snippets,
   onSnippetsChange,
+  updater,
   onClose,
   onSave,
 }: Props) {
@@ -340,6 +343,48 @@ export function SettingsDialog({
                 ))}
               </div>
             </Field>
+          </section>
+
+          <section className="border-t border-[var(--color-border)] pt-5">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <p className="text-[12.5px] font-medium text-[rgb(var(--color-text-2))]">
+                  Version
+                </p>
+                <p className="text-[13px]">
+                  {updater.currentVersion || '—'}
+                  {updater.status === 'ready' && updater.info && (
+                    <span className="text-accent"> · {updater.info.version} bereit</span>
+                  )}
+                  {updater.status === 'downloading' && updater.info && (
+                    <span className="text-[rgb(var(--color-text-3))]">
+                      {' '}
+                      · {updater.info.version} wird geladen ({updater.progress} %)
+                    </span>
+                  )}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void updater.checkNow()}
+                disabled={updater.status === 'checking' || updater.status === 'downloading'}
+                className="inline-flex items-center gap-2 h-9 px-3 rounded-lg bg-[rgb(var(--color-surface-2))] border border-[var(--color-border)] text-[13px] hover:bg-[rgb(var(--color-bg))] disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${updater.status === 'checking' ? 'animate-spin' : ''}`} />
+                Nach Updates suchen
+              </button>
+            </div>
+
+            {updater.status === 'idle' && !updater.info && (
+              <p className="mt-1.5 text-[11.5px] text-[rgb(var(--color-text-3))]">
+                Die App prüft beim Start und stündlich selbst.
+              </p>
+            )}
+            {updater.status === 'error' && updater.error && (
+              <p className="mt-1.5 text-[12px] text-red-600 dark:text-red-400">
+                Prüfung fehlgeschlagen: {updater.error}
+              </p>
+            )}
           </section>
 
           {error && <p className="text-[12.5px] text-red-600 dark:text-red-400">{error}</p>}
