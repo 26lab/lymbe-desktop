@@ -4,35 +4,79 @@ Native Desktop-Client für die Lymbe-AI-Plattform. Tauri 2 + React + TypeScript 
 
 - Bundle-Größe ≈ **10 MB** (Tauri statt Electron — kein gebundeltes Chromium)
 - Läuft auf **Windows 10/11, macOS 12+, Linux** (x86_64 + ARM)
-- Persistente Chat-History in der nativen App-Storage
-- Bot-Auswahl pro Chat, Markdown-Rendering, Streaming-Antworten
-- Custom Titlebar, Dark/Light/System Theme
+- **Schnellfrage per globalem Hotkey** — Frage stellen, ohne die laufende Anwendung zu verlassen
+- **Live-Chat-Übernahme aus dem Tray** — meldet wartende Besucher, auch wenn kein Browser offen ist
+- **Wissensdatenbank per Drag-and-drop** füllen
+- Verlauf wahlweise mit dem Konto synchronisiert, Volltextsuche über alle Chats
+- Geräteanmeldung per Code, einzeln widerrufbar
+- Custom Titlebar, Dark/Light/System Theme, signierte Auto-Updates
+
+## Was die App kann
+
+| Bereich | Funktion |
+|---|---|
+| **Chat** | Bot wählen, Streaming-Antworten, Markdown, Wissensdatenbank und Shop-Werkzeuge des Bots |
+| **Schnellfrage** | Rahmenloses Fenster über allen Anwendungen (Standard: `Alt+Space`). Nimmt auf Wunsch den Text aus der Zwischenablage als Kontext, legt die Antwort dort wieder ab. Fertige Aktionen: Erklären, Antwort formulieren, Übersetzen, Kürzen |
+| **Live-Chat** | Warteschlange sehen, Gespräch übernehmen, antworten, an die KI zurückgeben. Erreichbarkeit umschalten |
+| **Wissen** | Dokumente per Drag-and-drop oder Dateiauswahl in die Wissensdatenbank; Verarbeitungsstand sichtbar |
+| **Verlauf** | Lokal gespeichert, optional serverseitig gespiegelt — dann auf jedem Gerät und im Dashboard sichtbar |
+| **Kontingent** | Restliche KI-Antworten in der Seitenleiste, Warnung bevor Schluss ist |
+| **Textbausteine** | Wiederkehrende Formulierungen speichern und mit einem Klick einsetzen |
+| **Schwebendes Symbol** | Erscheint beim Minimieren oder Schließen: bleibt über allen Fenstern, frei verschiebbar, merkt sich seine Position. Klick holt die App zurück, Rechtsklick öffnet die Schnellfrage, ein Badge zeigt wartende Besucher |
+| **Tray** | Fenster schließen legt die App in den Tray; Benachrichtigungen zu wartenden Besuchern, neuen Leads und knappem Kontingent |
 
 ## Architektur
 
 ```
 lymbe-desktop/
-├── src/                    # React-Frontend
-│   ├── App.tsx            # Hauptkomponente, State-Verwaltung
-│   ├── components/        # Sidebar, ChatView, MessageList, Settings…
-│   ├── lib/
-│   │   ├── api.ts         # Lymbe-Backend HTTP-Client (Bearer-Token + SSE)
-│   │   ├── storage.ts     # tauri-plugin-store wrapper
-│   │   └── types.ts
-│   └── hooks/useTheme.ts
-└── src-tauri/             # Rust-Shell (minimal)
-    ├── src/lib.rs         # Plugin-Init only — keine Business-Logik
-    └── tauri.conf.json    # Window-Config, Bundler-Targets
+├── src/                      # React-Frontend
+│   ├── App.tsx              # Hauptfenster: Chat, Live, Wissen
+│   ├── QuickAsk.tsx         # Schnellfrage-Fenster (Hotkey)
+│   ├── Bubble.tsx           # Schwebendes Symbol (beim Minimieren)
+│   ├── components/          # Sidebar, ChatView, LivePanel, KnowledgePanel, Settings…
+│   ├── hooks/               # useTheme, useUpdater, useNotifications
+│   └── lib/
+│       ├── api.ts           # Backend-Client (Bearer-Token + SSE)
+│       ├── storage.ts       # tauri-plugin-store: Einstellungen, Chats, Geräte-ID, Bausteine
+│       └── types.ts
+└── src-tauri/               # Rust-Shell
+    ├── src/lib.rs           # Tray, globaler Hotkey, Fensterverhalten, Autostart
+    └── tauri.conf.json      # Zwei Fenster: main + quick
 ```
 
-Die App spricht das Lymbe-Backend über **zwei Endpoints** an, die wir aktuell so erwarten:
+Alle drei Fenster laden dasselbe Bundle; der Query-Parameter entscheidet, was
+gerendert wird (`src/main.tsx`): `?window=quick` die Schnellfrage,
+`?window=bubble` das schwebende Symbol, sonst das Hauptfenster.
 
-| Endpoint | Methode | Auth | Antwort |
-|---|---|---|---|
-| `/api/desktop-app/bots` | GET | `Authorization: Bearer lymbe_dt_…` | `{ bots: [{ id, name, description? }] }` |
-| `/api/desktop-app/chat` | POST | dito | Server-Sent Events `data: {"delta":"…"}` (Stream) |
+Die Rust-Seite bleibt bewusst dünn: Fachlogik liegt im Frontend, in `lib.rs`
+steht nur, was ohne Betriebssystem-Zugriff nicht geht.
 
-Die Token-Verifizierung läuft über `lib/desktop-app/tokens.ts` im lymbe-ai Repo (bcrypt-Hash + Prefix-Lookup). Beide Endpoints müssen in lymbe-ai noch ergänzt werden — siehe Abschnitt **"Backend-Integration"** weiter unten.
+## Backend-Endpunkte
+
+Alle Anfragen tragen `Authorization: Bearer <token>` und `X-Lymbe-App-Version`.
+Der Token ist entweder ein Lizenz-Token (`lymbe_dt_…`, für alle Geräte einer
+Lizenz) oder ein Geräte-Token (`lymbe_dv_…`, aus der Aktivierung, einzeln
+widerrufbar).
+
+| Endpunkt | Methode | Zweck |
+|---|---|---|
+| `/api/desktop-app/activation/start` | POST | Aktivierungscode anfordern (ohne Auth) |
+| `/api/desktop-app/activation/poll` | POST | Nach Bestätigung das Geräte-Token abholen (ohne Auth) |
+| `/api/desktop-app/bots` | GET | Verfügbare Bots |
+| `/api/desktop-app/chat` | POST | Antwort als SSE-Stream (`data: {"delta":"…"}`) |
+| `/api/desktop-app/usage` | GET | Kontingent, Tarif, freigeschaltete Funktionen |
+| `/api/desktop-app/notifications` | GET | Sammelmeldung für den Tray |
+| `/api/desktop-app/conversations` | GET | Verlauf (geräteübergreifend) |
+| `/api/desktop-app/conversations/:id` | GET / DELETE | Einzelne Unterhaltung lesen oder löschen |
+| `/api/desktop-app/live/queue` | GET | Warteschlange und eigene Gespräche |
+| `/api/desktop-app/live/status` | POST | Erreichbarkeit setzen |
+| `/api/desktop-app/live/:id` | GET / POST | Nachrichten lesen / als Agent antworten |
+| `/api/desktop-app/live/:id/claim` | POST | Gespräch übernehmen |
+| `/api/desktop-app/live/:id/release` | POST | An die KI zurückgeben |
+| `/api/desktop-app/knowledge` | GET / POST | Dokumente auflisten / hochladen |
+| `/api/desktop-app/update/…` | GET | Updater-Manifest (Tauri) |
+
+Serverseitig liegen diese Routen im lymbe-ai-Repo unter `app/api/desktop-app/`.
 
 ## Voraussetzungen
 
@@ -81,13 +125,27 @@ npm run tauri:dev
 
 Startet Vite + Tauri mit Hot-Reload. Die erste Kompilierung der Rust-Crate dauert ~3–5 Minuten (einmalig), danach sind Reloads in Sekunden da.
 
-Beim ersten Start öffnet sich automatisch der Einstellungs-Dialog. Dort:
+Ohne Rust-Toolchain lässt sich wenigstens das Frontend prüfen:
 
-1. **Server-URL** eintragen (`https://app.lymbe.ai`)
-2. **API-Token** holen: Web-Dashboard → User-Dropdown rechts oben → "Meine Desktop-App" → "API-Token erzeugen" (einmalig sichtbar!) → kopieren → hier einfügen
-3. **"Verbindung testen"** klicken — sollte deine Bot-Liste laden
-4. **Standard-Bot** auswählen
-5. Speichern
+```bash
+npm run build
+```
+
+### Erste Anmeldung
+
+Beim ersten Start zeigt die App einen achtstelligen Code:
+
+1. **Server-URL** prüfen (`https://app.lymbe.ai`)
+2. **Code anfordern**
+3. Im Web-Dashboard unter **Profil → Meine Desktop-App** den Code eintragen und freischalten
+4. Die App holt ihr Geräte-Token selbst ab und startet
+
+Der Token wird nie angezeigt und liegt verschlüsselt in der nativen
+App-Storage. Ein verlorenes Gerät lässt sich im Dashboard einzeln abmelden,
+ohne die übrigen auszusperren.
+
+> **Fallback:** Ältere Installationen und Sonderfälle können weiterhin einen
+> Lizenz-Token von Hand eintragen (Einstellungen → Zugang).
 
 ## Build pro Plattform
 
@@ -125,42 +183,26 @@ Erzeugt `.deb`, `.rpm` und `.AppImage` unter `src-tauri/target/release/bundle/`.
 
 ## Releases (alle Plattformen automatisch)
 
-Tauri kann nicht zuverlässig cross-compilen. Damit du nicht drei Rechner anwerfen musst, übernimmt **GitHub Actions** den Multi-OS-Build:
-
-- `.github/workflows/release.yml` — getriggert wenn du einen Tag pushst (z. B. `v0.1.0`). Läuft parallel auf `macos-latest`, `windows-latest`, `ubuntu-22.04`, baut Installer und veröffentlicht ein **Draft Release** mit allen Artifacts.
-- `.github/workflows/build.yml` — bei jedem PR ein Build-Smoke-Test, damit du nicht im Tag-Moment merkst dass was kaputt ist.
-
-### Einrichtung (einmalig)
-
-1. Repo auf GitHub anlegen, z. B. `26lab/lymbe-desktop`
-2. `git remote add origin git@github.com:26lab/lymbe-desktop.git && git push -u origin main`
-3. Fertig — die Workflows werden beim ersten Push automatisch erkannt
+- `.github/workflows/release.yml` — getriggert wenn du einen Tag pushst (z. B. `v0.2.0`). Läuft parallel auf `macos-latest`, `windows-latest`, `ubuntu-22.04`, baut Installer und veröffentlicht ein **Draft Release** mit allen Artifacts.
+- `.github/workflows/build.yml` — bei jedem PR ein Build-Smoke-Test.
 
 ### Release veröffentlichen
 
 ```bash
 # Version in package.json + src-tauri/tauri.conf.json + src-tauri/Cargo.toml anheben
-# (idealerweise per "npm version 0.1.1" — bumpt package.json automatisch)
-
-git commit -am "release: v0.1.1"
-git tag v0.1.1
+git commit -am "release: v0.2.0"
+git tag v0.2.0
 git push --follow-tags
 ```
 
-Nach ~10–15 Minuten findest du ein **Draft Release** unter `Releases` mit:
+Nach ~10–15 Minuten liegt ein **Draft Release** bereit — Body bearbeiten,
+**Publish** klicken.
 
-- `Lymbe AI_0.1.1_x64_en-US.msi` (Windows Installer)
-- `Lymbe AI_0.1.1_x64-setup.exe` (Windows NSIS)
-- `Lymbe AI_0.1.1_universal.dmg` (macOS Universal — Intel + Apple Silicon)
-- `lymbe-ai_0.1.1_amd64.deb` (Debian/Ubuntu)
-- `lymbe-ai-0.1.1-1.x86_64.rpm` (Fedora/RHEL)
-- `lymbe-ai_0.1.1_amd64.AppImage` (portable Linux)
+### Code-Signing
 
-Den Release-Body bearbeiten, **Publish** klicken — fertig.
-
-### Code-Signing (für seriöse Distribution dringend empfohlen)
-
-Ohne Signing zeigt **Windows SmartScreen** "Unbekannter Herausgeber" und macOS' **Gatekeeper** blockt den ersten Start. Für interne Tests OK; für externe Endnutzer:
+Ohne Signing zeigt **Windows SmartScreen** "Unbekannter Herausgeber" und macOS'
+**Gatekeeper** blockt den ersten Start. Für interne Tests OK; für externe
+Endnutzer:
 
 **macOS** ($99/Jahr Apple Developer Program):
 1. Developer ID Application Certificate aus Apple-Keychain als `.p12` exportieren
@@ -174,86 +216,45 @@ Ohne Signing zeigt **Windows SmartScreen** "Unbekannter Herausgeber" und macOS' 
 - Eigenes Cert: privater Schlüssel als `TAURI_SIGNING_PRIVATE_KEY` + `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` in Secrets
 - Günstigere Alternative: [Azure Trusted Signing](https://learn.microsoft.com/en-us/azure/trusted-signing/) (~$10/Monat)
 
-Alle Secrets sind im `release.yml` schon als ENV-Variablen verdrahtet — wenn du sie in GitHub Settings → Secrets ablegst, wird automatisch signiert.
+## Auto-Updates
 
-### Auto-Updates (optional, später aktivierbar)
+Aktiv. Der Client fragt beim Start
+`/api/desktop-app/update/{{target}}/{{arch}}/{{current_version}}` ab; das
+Backend liefert das signierte Manifest aus dem GitHub-Release. Der öffentliche
+Schlüssel steht in `tauri.conf.json` unter `plugins.updater.pubkey`, der private
+liegt als `TAURI_SIGNING_PRIVATE_KEY` in den GitHub-Secrets.
 
-Tauri 2 hat einen eingebauten Updater: `@tauri-apps/plugin-updater`. Aktivierung:
-
-1. `npm install @tauri-apps/plugin-updater` + im `Cargo.toml` `tauri-plugin-updater` ergänzen
-2. In `tauri.conf.json` unter `plugins.updater` deinen Public-Key + Endpoint hinterlegen
-3. Beim Release über `tauri-action` automatisch ein `latest.json` generieren lassen
-4. Im App-Start checken `await check()` → wenn neue Version: User-Dialog → install
-
-Für jetzt absichtlich weggelassen — der Client funktioniert auch ohne, und der Updater braucht einen statischen URL-Endpoint (z. B. einen Bucket oder ein simples Lymbe-Backend-Route).
+Gefundene Updates werden im Hintergrund geladen; die Seitenleiste bietet dann
+"Neu starten, um zu aktualisieren" an.
 
 ## Icons
 
-Vor dem ersten `tauri:build` Icons hinzufügen:
-
 ```bash
-# Quellbild ablegen
 cp deine-logo-1024.png src-tauri/icons/icon.png
-# Tauri CLI generiert alle Varianten
 npm run tauri -- icon src-tauri/icons/icon.png
 ```
 
-Während `tauri:dev` reicht ein einzelnes `src-tauri/icons/32x32.png` als Platzhalter.
+## Bekannte Grenzen
 
-## Backend-Integration (im lymbe-ai Repo zu ergänzen)
-
-Damit der Client läuft, brauchen wir im lymbe-ai Backend zwei kleine Routen. Beide verifizieren den Bearer-Token über `verifyDesktopAppToken()` aus `lib/desktop-app/tokens.ts` (existiert schon).
-
-### `app/api/desktop-app/bots/route.ts`
-
-```ts
-import { NextRequest, NextResponse } from 'next/server';
-import { verifyDesktopAppToken } from '@/lib/desktop-app/tokens';
-import { getTenantDb } from '@/lib/db/tenant';
-
-export async function GET(request: NextRequest) {
-  const header = request.headers.get('authorization');
-  if (!header?.startsWith('Bearer ')) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  const license = await verifyDesktopAppToken(header.slice(7).trim());
-  if (!license) return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-
-  const tenantDb = await getTenantDb(license.tenantId);
-  // If the license is pinned to a bot, restrict the list. Otherwise return all
-  // bots the tenant has — matches the Web-App permission model.
-  const bots = license.assignedBotId
-    ? await tenantDb.bot.findMany({
-        where: { id: license.assignedBotId, deletedAt: null },
-        select: { id: true, name: true, description: true },
-      })
-    : await tenantDb.bot.findMany({
-        where: { deletedAt: null },
-        select: { id: true, name: true, description: true },
-        orderBy: { createdAt: 'asc' },
-      });
-  return NextResponse.json({ bots });
-}
-```
-
-### `app/api/desktop-app/chat/route.ts`
-
-```ts
-import { NextRequest, NextResponse } from 'next/server';
-import { verifyDesktopAppToken } from '@/lib/desktop-app/tokens';
-import { streamText } from 'ai';
-// ... resolve model + tools the same way app/api/widget/[botId]/chat/route.ts does
-// and return result.toTextStreamResponse() (or toDataStreamResponse with our
-// own data: framing).
-```
-
-Der Vercel AI SDK liefert mit `result.toTextStreamResponse()` direkt einen SSE-Stream. Die Desktop-App liest sowohl `data: { delta: "…" }` als auch plain text-chunks (siehe `lib/api.ts`).
+- **Dateizugriff:** Das Ziehen von Dokumenten funktioniert für Pfade unterhalb
+  des Benutzerverzeichnisses (`fs:scope` in `src-tauri/capabilities/default.json`).
+  Dateien von anderen Laufwerken erst dorthin kopieren oder den Scope erweitern.
+- **Hotkey belegt:** Nutzt eine andere Anwendung dieselbe Kombination,
+  registriert das System sie nicht — die App meldet das und man wählt in den
+  Einstellungen eine andere.
+- **Live-Chat braucht eine zugewiesene Lizenz:** Nur wenn die Lizenz im
+  Dashboard einem Teammitglied zugeordnet ist, lassen sich Gespräche übernehmen
+  — sonst gäbe es niemanden, dem sie zugeordnet werden.
+- **Schwebendes Symbol unter Linux:** Das Fenster ist durchsichtig und braucht
+  einen laufenden Compositor. Ohne ihn zeigen manche Desktop-Umgebungen ein
+  graues Quadrat statt der runden Blase.
 
 ## Token-Sicherheit
 
-- Token wird über tauri-plugin-store in der nativen App-Storage abgelegt (verschlüsselt OS-spezifisch, NICHT in localStorage)
-- Backend rotiert den Token bei jedem Reassignment der Lizenz an einen anderen Mitarbeiter
-- Mitarbeiter kann jederzeit über das Web-Dashboard einen neuen Token erzeugen → alter Token wird sofort ungültig
+- Geräte-Token liegen in der nativen App-Storage (nicht in localStorage)
+- Jedes Gerät hat ein eigenes Token; Abmelden trifft nur dieses Gerät
+- Beim Zuweisen einer Lizenz an eine andere Person rotiert das Lizenz-Token sofort
+- Das Klartext-Token wird bei der Aktivierung genau einmal ausgeliefert und danach serverseitig gelöscht
 
 ## Lizenz
 

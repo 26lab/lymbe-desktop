@@ -1,6 +1,6 @@
 [package]
 name = "lymbe-desktop"
-version = "0.1.1"
+version = "0.2.0"
 description = "Lymbe AI Desktop"
 authors = ["Lymbe AI"]
 edition = "2021"
@@ -14,14 +14,27 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.0", features = [] }
 
 [dependencies]
-tauri = { version = "2.0", features = [] }
+# 2.2 ist die Untergrenze wegen TrayIconBuilder::show_menu_on_left_click —
+# davor hiess die Methode menu_on_left_click.
+tauri = { version = "2.2", features = ["tray-icon", "image-png"] }
 tauri-plugin-store = "2.0"
 tauri-plugin-shell = "2.0"
 tauri-plugin-dialog = "2.0"
 tauri-plugin-updater = "2.0"
 tauri-plugin-process = "2.0"
+tauri-plugin-clipboard-manager = "2.0"
+tauri-plugin-notification = "2.0"
+tauri-plugin-os = "2.0"
+tauri-plugin-fs = "2.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+# Nur auf dem Desktop verfuegbar — global-shortcut, autostart und
+# single-instance haben keine mobilen Gegenstuecke.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-global-shortcut = "2.0"
+tauri-plugin-autostart = "2.0"
+tauri-plugin-single-instance = "2.0"
 
 [features]
 # Default `custom-protocol` is enabled by Tauri's bundling logic in release

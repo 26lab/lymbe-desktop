@@ -1,72 +1,187 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { nanoid } from 'nanoid';
+import { invoke } from '@tauri-apps/api/core';
 import { open as openExternal } from '@tauri-apps/plugin-shell';
-import { Sidebar } from './components/Sidebar';
+import { disable as disableAutostart, enable as enableAutostart, isEnabled as autostartEnabled } from '@tauri-apps/plugin-autostart';
+import { Sidebar, type View } from './components/Sidebar';
 import { ChatView } from './components/ChatView';
 import { SettingsDialog } from './components/SettingsDialog';
+import { ActivationScreen } from './components/ActivationScreen';
+import { LivePanel } from './components/LivePanel';
+import { KnowledgePanel } from './components/KnowledgePanel';
 import { useTheme } from './hooks/useTheme';
 import { useUpdater } from './hooks/useUpdater';
-import { loadChats, loadSettings, saveChats, saveSettings } from './lib/storage';
-import { listBots, streamChat } from './lib/api';
-import type { BotSummary, Chat, ChatMessage, Settings } from './lib/types';
+import { useNotifications } from './hooks/useNotifications';
+import { loadChats, loadSettings, loadSnippets, saveChats, saveSettings } from './lib/storage';
+import {
+  deleteRemoteConversation,
+  fetchRemoteConversation,
+  fetchUsage,
+  listBots,
+  listRemoteConversations,
+  streamChat,
+} from './lib/api';
+import type {
+  BotSummary,
+  Chat,
+  ChatMessage,
+  PromptSnippet,
+  Settings,
+  UsageInfo,
+} from './lib/types';
 import { DEFAULT_SETTINGS } from './lib/types';
 
 export default function App() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [bots, setBots] = useState<BotSummary[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [forceManualToken, setForceManualToken] = useState(false);
+  const [view, setView] = useState<View>('chat');
+  const [usage, setUsage] = useState<UsageInfo | null>(null);
+  const [snippets, setSnippets] = useState<PromptSnippet[]>([]);
+  const [prefill, setPrefill] = useState<{ text: string; nonce: number } | undefined>();
 
   const abortRef = useRef<AbortController | null>(null);
   const persistTimer = useRef<number | null>(null);
 
   useTheme(settings.theme);
   const updater = useUpdater(settings);
+  const notifications = useNotifications(settings, settings.liveChatEnabled || settings.notificationsEnabled);
 
-  // Initial load — settings + chats + os.
+  const connected = !!settings.token && !!settings.serverUrl;
+
+  // Initial load — settings + chats + snippets.
   useEffect(() => {
     (async () => {
-      const [s, c] = await Promise.all([loadSettings(), loadChats()]);
+      const [s, c, sn] = await Promise.all([loadSettings(), loadChats(), loadSnippets()]);
       setSettings(s);
       setChats(c);
+      setSnippets(sn);
       setActiveChatId(c[0]?.id ?? null);
-
-      // Open settings on first launch when no token is set yet — otherwise the
-      // app would just sit there confused.
-      if (!s.token) setSettingsOpen(true);
+      setSettingsLoaded(true);
     })();
   }, []);
 
-  // Refresh bot list whenever token/server changes (and we actually have both).
+  // Refresh bot list + quota whenever the connection details change.
   useEffect(() => {
-    if (!settings.token || !settings.serverUrl) {
+    if (!connected) {
       setBots([]);
+      setUsage(null);
       return;
     }
     let cancelled = false;
+
     listBots(settings)
       .then((list) => {
         if (!cancelled) setBots(list);
       })
       .catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (!cancelled) setErrorBanner(msg);
+        if (!cancelled) setErrorBanner(err instanceof Error ? err.message : String(err));
       });
+
+    fetchUsage(settings)
+      .then((u) => {
+        if (!cancelled) setUsage(u);
+      })
+      .catch(() => {
+        // Kontingentanzeige ist Beiwerk — ein Fehler hier darf den Chat nicht
+        // mit einer Fehlermeldung zupflastern.
+      });
+
     return () => {
       cancelled = true;
     };
-  }, [settings.token, settings.serverUrl]);
+  }, [connected, settings.token, settings.serverUrl]);
+
+  // Verlauf vom Server nachziehen: Was dort liegt, aber lokal fehlt (neues
+  // Geraet, Neuinstallation), erscheint als Eintrag ohne Nachrichten. Die
+  // Nachrichten kommen erst beim Oeffnen — sonst waeren es beim Start so viele
+  // Anfragen wie Unterhaltungen.
+  useEffect(() => {
+    if (!connected || !settings.syncHistory || !settingsLoaded) return;
+    let cancelled = false;
+
+    listRemoteConversations(settings)
+      .then((remote) => {
+        if (cancelled || remote.length === 0) return;
+        setChats((prev) => {
+          const known = new Set(prev.map((c) => c.id));
+          const additions: Chat[] = remote
+            .filter((r) => !known.has(r.clientKey))
+            .map((r) => ({
+              id: r.clientKey,
+              title: r.title,
+              botId: r.botId,
+              botName: r.botName,
+              messages: [],
+              createdAt: r.createdAt,
+              updatedAt: r.updatedAt,
+              remoteId: r.id,
+            }));
+          if (additions.length === 0) {
+            // Trotzdem die Server-IDs nachtragen, damit sich Chats loeschen
+            // lassen, die auf diesem Geraet entstanden sind.
+            const remoteByKey = new Map(remote.map((r) => [r.clientKey, r.id]));
+            return prev.map((c) =>
+              c.remoteId || !remoteByKey.has(c.id) ? c : { ...c, remoteId: remoteByKey.get(c.id) },
+            );
+          }
+          return [...prev, ...additions].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+        });
+      })
+      .catch((err) => console.warn('[history] sync failed', err));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [connected, settings, settingsLoaded]);
 
   // Debounced persistence — we don't want to write to disk on every keystroke.
   useEffect(() => {
+    if (!settingsLoaded) return;
     if (persistTimer.current) window.clearTimeout(persistTimer.current);
     persistTimer.current = window.setTimeout(() => {
       void saveChats(chats);
     }, 250);
-  }, [chats]);
+  }, [chats, settingsLoaded]);
+
+  // Globalen Hotkey registrieren. Schlaegt das fehl (andere Anwendung hat die
+  // Kombination belegt), sagen wir das — stilles Nichtstun waere schlimmer.
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    invoke<string>('apply_global_shortcut', { accelerator: settings.hotkey || '' }).catch(
+      (err: unknown) => {
+        setErrorBanner(err instanceof Error ? err.message : String(err));
+      },
+    );
+  }, [settings.hotkey, settingsLoaded]);
+
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    (async () => {
+      try {
+        const active = await autostartEnabled();
+        if (settings.autostart && !active) await enableAutostart();
+        if (!settings.autostart && active) await disableAutostart();
+      } catch (err) {
+        console.warn('[autostart] toggle failed', err);
+      }
+    })();
+  }, [settings.autostart, settingsLoaded]);
+
+  // Ob das schwebende Symbol erscheinen darf, entscheidet die Rust-Seite beim
+  // Minimieren — sie muss die Einstellung deshalb kennen.
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    void invoke('set_bubble_enabled', { enabled: settings.floatingBubble }).catch((err) =>
+      console.warn('[bubble] toggle failed', err),
+    );
+  }, [settings.floatingBubble, settingsLoaded]);
 
   // Intercept clicks on links so they open in the user's browser, not inside
   // the Tauri webview (which has no nav controls).
@@ -97,6 +212,48 @@ export default function App() {
     setSettings(next);
   }, []);
 
+  const handleActivated = useCallback(
+    async (patch: Partial<Settings>) => {
+      setSettings((prev) => {
+        const next = { ...prev, ...patch };
+        void saveSettings(next);
+        return next;
+      });
+      setForceManualToken(false);
+    },
+    [],
+  );
+
+  const handleSelectChat = useCallback(
+    (id: string) => {
+      setActiveChatId(id);
+      const chat = chats.find((c) => c.id === id);
+      // Vom Server nachgeladener Eintrag ohne Inhalt — jetzt die Nachrichten holen.
+      if (chat && chat.messages.length === 0 && chat.remoteId) {
+        fetchRemoteConversation(settings, chat.remoteId)
+          .then((data) => {
+            setChats((prev) =>
+              prev.map((c) =>
+                c.id === id
+                  ? {
+                      ...c,
+                      messages: data.messages.map((m) => ({
+                        id: m.id,
+                        role: (m.role === 'user' ? 'user' : 'assistant') as ChatMessage['role'],
+                        content: m.content,
+                        createdAt: m.createdAt,
+                      })),
+                    }
+                  : c,
+              ),
+            );
+          })
+          .catch((err) => setErrorBanner(err instanceof Error ? err.message : String(err)));
+      }
+    },
+    [chats, settings],
+  );
+
   const handleNewChat = useCallback(() => {
     const botId = settings.defaultBotId || bots[0]?.id || '';
     if (!botId) {
@@ -117,33 +274,53 @@ export default function App() {
     setChats((prev) => [chat, ...prev]);
     setActiveChatId(chat.id);
     setErrorBanner(null);
+    setView('chat');
   }, [bots, settings.defaultBotId]);
 
-  const handleDeleteChat = useCallback((id: string) => {
-    setChats((prev) => prev.filter((c) => c.id !== id));
-    setActiveChatId((current) => (current === id ? null : current));
-  }, []);
+  const handleDeleteChat = useCallback(
+    (id: string) => {
+      const chat = chats.find((c) => c.id === id);
+      setChats((prev) => prev.filter((c) => c.id !== id));
+      setActiveChatId((current) => (current === id ? null : current));
+      // Auch serverseitig entfernen, sonst taucht der Chat beim naechsten
+      // Abgleich wieder auf.
+      if (chat?.remoteId && settings.syncHistory) {
+        void deleteRemoteConversation(settings, chat.remoteId).catch((err) =>
+          console.warn('[history] remote delete failed', err),
+        );
+      }
+    },
+    [chats, settings],
+  );
 
-  const handlePickBot = useCallback((botId: string) => {
-    if (!activeChatId) return;
-    setChats((prev) =>
-      prev.map((c) =>
-        c.id === activeChatId
-          ? {
-              ...c,
-              botId,
-              botName: bots.find((b) => b.id === botId)?.name ?? null,
-              updatedAt: new Date().toISOString(),
-            }
-          : c,
-      ),
-    );
-  }, [activeChatId, bots]);
+  const handlePickBot = useCallback(
+    (botId: string) => {
+      if (!activeChatId) return;
+      setChats((prev) =>
+        prev.map((c) =>
+          c.id === activeChatId
+            ? {
+                ...c,
+                botId,
+                botName: bots.find((b) => b.id === botId)?.name ?? null,
+                updatedAt: new Date().toISOString(),
+              }
+            : c,
+        ),
+      );
+    },
+    [activeChatId, bots],
+  );
 
   const handleCancel = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
     setStreaming(false);
+  }, []);
+
+  const handleUseSnippet = useCallback((snippet: PromptSnippet) => {
+    setView('chat');
+    setPrefill({ text: snippet.body, nonce: Date.now() });
   }, []);
 
   const handleSend = useCallback(
@@ -194,6 +371,9 @@ export default function App() {
         settings,
         botId: activeChat.botId,
         messages: wireHistory,
+        // Die lokale Chat-ID ist zugleich der Schluessel des serverseitigen
+        // Verlaufs. Ohne Spiegelung senden wir sie nicht mit.
+        conversationId: settings.syncHistory ? chatId : undefined,
         signal: controller.signal,
         onChunk: (chunk) => {
           setChats((prev) =>
@@ -211,6 +391,10 @@ export default function App() {
         onDone: () => {
           setStreaming(false);
           abortRef.current = null;
+          // Verbrauch aktualisieren, damit der Balken in der Seitenleiste stimmt.
+          fetchUsage(settings)
+            .then(setUsage)
+            .catch(() => undefined);
         },
         onError: (err) => {
           setStreaming(false);
@@ -222,33 +406,84 @@ export default function App() {
     [activeChat, settings],
   );
 
+  // ------------------------------------------------------------------------
+  // Render
+  // ------------------------------------------------------------------------
+
+  if (!settingsLoaded) {
+    return <div className="h-full" />;
+  }
+
+  // Erstinbetriebnahme: ohne Zugang zeigt die App den Aktivierungsbildschirm
+  // statt eines leeren Chatfensters.
+  if (!connected && !forceManualToken) {
+    return (
+      <ActivationScreen
+        settings={settings}
+        onActivated={handleActivated}
+        onManualToken={() => {
+          setForceManualToken(true);
+          setSettingsOpen(true);
+        }}
+      />
+    );
+  }
+
+  const liveAvailable = settings.liveChatEnabled && (usage?.features.liveChat ?? false);
+  const knowledgeAvailable = usage?.features.knowledgeUpload ?? true;
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 flex min-h-0">
         <Sidebar
+          view={view}
+          onChangeView={setView}
           chats={chats}
           activeChatId={activeChatId}
-          onSelectChat={setActiveChatId}
+          onSelectChat={handleSelectChat}
           onNewChat={handleNewChat}
           onDeleteChat={handleDeleteChat}
           onOpenSettings={() => setSettingsOpen(true)}
           updateReady={updater.status === 'ready' || updater.status === 'installing'}
           updateInstalling={updater.status === 'installing'}
           onInstallUpdate={updater.installAndRestart}
+          usage={usage}
+          notifications={notifications}
+          snippets={snippets}
+          onUseSnippet={handleUseSnippet}
+          liveAvailable={liveAvailable}
+          knowledgeAvailable={knowledgeAvailable}
         />
-        <ChatView
-          chat={activeChat}
-          bots={bots}
-          streaming={streaming}
-          errorBanner={errorBanner}
-          onSend={handleSend}
-          onCancel={handleCancel}
-          onPickBot={handlePickBot}
-        />
+
+        {view === 'chat' && (
+          <ChatView
+            chat={activeChat}
+            bots={bots}
+            streaming={streaming}
+            errorBanner={errorBanner}
+            onSend={handleSend}
+            onCancel={handleCancel}
+            onPickBot={handlePickBot}
+            prefill={prefill}
+          />
+        )}
+        {view === 'live' && (
+          <div className="flex-1 min-w-0">
+            <LivePanel settings={settings} />
+          </div>
+        )}
+        {view === 'knowledge' && (
+          <div className="flex-1 min-w-0">
+            <KnowledgePanel settings={settings} allowed={knowledgeAvailable} />
+          </div>
+        )}
       </div>
+
       {settingsOpen && (
         <SettingsDialog
           settings={settings}
+          snippets={snippets}
+          onSnippetsChange={setSnippets}
           onClose={() => setSettingsOpen(false)}
           onSave={handleSaveSettings}
         />

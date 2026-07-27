@@ -11,6 +11,7 @@ interface Props {
   onSend: (text: string) => void;
   onCancel: () => void;
   onPickBot: (botId: string) => void;
+  prefill?: { text: string; nonce: number };
 }
 
 export function ChatView({
@@ -21,6 +22,7 @@ export function ChatView({
   onSend,
   onCancel,
   onPickBot,
+  prefill,
 }: Props) {
   if (!chat) {
     return (
@@ -68,6 +70,7 @@ export function ChatView({
         onSend={onSend}
         onCancel={onCancel}
         disabled={!chat.botId}
+        prefill={prefill}
       />
     </section>
   );

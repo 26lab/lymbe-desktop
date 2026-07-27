@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Lymbe AI",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "identifier": "ai.lymbe.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -21,8 +21,38 @@
         "resizable": true,
         "fullscreen": false,
         "center": true
+      },
+      {
+        "title": "Lymbe Schnellfrage",
+        "label": "quick",
+        "url": "index.html?window=quick",
+        "width": 720,
+        "height": 460,
+        "resizable": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "center": true,
+        "shadow": true
+      },
+      {
+        "title": "Lymbe",
+        "label": "bubble",
+        "url": "index.html?window=bubble",
+        "width": 88,
+        "height": 88,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "focus": false
       }
     ],
+    "macOSPrivateApi": true,
     "security": {
       "csp": null
     }
@@ -32,7 +62,7 @@
     "targets": "all",
     "category": "Productivity",
     "shortDescription": "Lymbe AI Desktop — KI-Mitarbeiter direkt auf deinem Rechner",
-    "longDescription": "Native Desktop-App für die Lymbe AI Plattform. Verbinde dich mit deinem zugewiesenen Bot und chatte direkt vom Desktop.",
+    "longDescription": "Native Desktop-App für die Lymbe AI Plattform. Schnellfrage per Hotkey, Live-Chat-Übernahme aus dem Tray, Wissensdatenbank per Drag-and-drop.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

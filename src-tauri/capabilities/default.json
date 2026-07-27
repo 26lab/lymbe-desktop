@@ -1,14 +1,34 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capabilities for the main window: persistent store, open links, native dialogs.",
-  "windows": ["main"],
+  "description": "Berechtigungen fuer Hauptfenster, Schnellfrage und das schwebende Symbol: Speicher, Links, Dialoge, Updates, Zwischenablage, Benachrichtigungen, Autostart und Dateiauswahl fuer die Wissensdatenbank.",
+  "windows": ["main", "quick", "bubble"],
   "permissions": [
     "core:default",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-set-focus",
+    "core:window:allow-center",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-position",
+    "core:window:allow-outer-position",
+    "core:window:allow-outer-size",
+    "core:window:allow-current-monitor",
     "store:default",
     "shell:allow-open",
     "dialog:default",
     "updater:default",
-    "process:default"
+    "process:default",
+    "os:default",
+    "notification:default",
+    "clipboard-manager:allow-read-text",
+    "clipboard-manager:allow-write-text",
+    "global-shortcut:default",
+    "autostart:default",
+    "fs:allow-read-file",
+    {
+      "identifier": "fs:scope",
+      "allow": ["$HOME/**", "$DESKTOP/**", "$DOCUMENT/**", "$DOWNLOAD/**"]
+    }
   ]
 }

@@ -7,6 +7,12 @@ interface Props {
   onSend: (text: string) => void;
   onCancel?: () => void;
   placeholder?: string;
+  /**
+   * Von aussen eingesetzter Text (Textbaustein aus der Sidebar). `nonce`
+   * aendert sich bei jedem Einfuegen — nur so laesst sich derselbe Baustein
+   * zweimal hintereinander einsetzen.
+   */
+  prefill?: { text: string; nonce: number };
 }
 
 export function MessageInput({
@@ -15,9 +21,16 @@ export function MessageInput({
   onSend,
   onCancel,
   placeholder = 'Nachricht eingeben…',
+  prefill,
 }: Props) {
   const [value, setValue] = useState('');
   const ref = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!prefill?.text) return;
+    setValue(prefill.text);
+    ref.current?.focus();
+  }, [prefill?.nonce, prefill?.text]);
 
   // Auto-grow the textarea up to 8 lines, then start scrolling internally.
   useEffect(() => {
