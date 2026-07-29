@@ -201,20 +201,42 @@ Nach ~10–15 Minuten liegt ein **Draft Release** bereit — Body bearbeiten,
 ### Code-Signing
 
 Ohne Signing zeigt **Windows SmartScreen** "Unbekannter Herausgeber" und macOS'
-**Gatekeeper** blockt den ersten Start. Für interne Tests OK; für externe
-Endnutzer:
+**Gatekeeper** blockt den ersten Start.
 
-**macOS** ($99/Jahr Apple Developer Program):
+**Stand:** macOS-Builds werden ab v0.2.2 **ad-hoc signiert**
+(`bundle.macOS.signingIdentity: "-"` in `tauri.conf.json`) — kein Apple-Account
+nötig. Das behebt die Meldung *"Lymbe AI ist beschädigt und kann nicht geöffnet
+werden"*, die auf Apple Silicon bei unsigniertem Code statt des normalen
+Gatekeeper-Dialogs erscheint. Nutzer müssen den ersten Start weiterhin über
+*Systemeinstellungen → Datenschutz & Sicherheit → "Dennoch öffnen"* freigeben.
+Bei bereits heruntergeladenen älteren Builds hilft:
+
+```bash
+xattr -cr "/Applications/Lymbe AI.app"
+```
+
+**macOS** ($99/Jahr Apple Developer Program) — erst damit ist die Warnung ganz
+weg. Setzt man `APPLE_SIGNING_IDENTITY`, überschreibt das die Ad-hoc-Einstellung
+aus `tauri.conf.json`; die Config muss also nicht angefasst werden:
 1. Developer ID Application Certificate aus Apple-Keychain als `.p12` exportieren
 2. Als Base64 in GitHub-Secrets ablegen:
    - `APPLE_CERTIFICATE` (base64-codierte `.p12`)
    - `APPLE_CERTIFICATE_PASSWORD`
    - `APPLE_SIGNING_IDENTITY` (z. B. `Developer ID Application: Flubber Pixels UG (TEAM_ID)`)
    - `APPLE_ID`, `APPLE_PASSWORD` (App-Specific Password), `APPLE_TEAM_ID`
+3. Alle als `env:` in den `tauri-action`-Step in `release.yml` eintragen —
+   fehlt `APPLE_CERTIFICATE`, überspringt Tauri das Signing ohne Fehler.
 
-**Windows** (~€300–500/Jahr EV-Code-Signing-Cert):
-- Eigenes Cert: privater Schlüssel als `TAURI_SIGNING_PRIVATE_KEY` + `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` in Secrets
-- Günstigere Alternative: [Azure Trusted Signing](https://learn.microsoft.com/en-us/azure/trusted-signing/) (~$10/Monat)
+**Windows** — noch offen. Zwei Optionen:
+- [Azure Artifact Signing](https://learn.microsoft.com/en-us/azure/artifact-signing/quickstart)
+  (ex "Trusted Signing", $9,99/Monat) über `bundle.windows.signCommand` +
+  `artifact-signing-cli`. Muss **im** Build signieren, nicht danach: `.sig`-Dateien
+  für den Updater werden über den fertigen Installer berechnet, nachträgliches
+  Signieren invalidiert sie.
+- Eigenes EV-Cert (~€300–500/Jahr) über `bundle.windows.certificateThumbprint`.
+
+Nicht verwechseln: `TAURI_SIGNING_PRIVATE_KEY` ist der minisign-Schlüssel des
+Auto-Updaters und hat mit Authenticode/Gatekeeper nichts zu tun.
 
 ## Auto-Updates
 
